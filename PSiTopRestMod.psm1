@@ -1,26 +1,27 @@
-
+<#
+ Tool:    PSiTopRestMod.psm1
+ Author:  Johann Enquist
+ Email:   administrator@boomandfreeze.com
+ NOTES:   Powershell module to interact with iTop Web API
+#>
 
 function Get-iTopBrand {
-  
-  
-  <#
+<#
 .SYNOPSIS
-    Query iTop server for all available Brands and select a brand if one is supplied.
+  Query iTop server for all available Brands and select a brand if one is supplied.
 
 .DESCRIPTION
-	sends a core/get operation to the iTop REST api. If no brand is supplied, will return all brands. if one is 
-    supplied will apply '| where {$_.name -like "*SuppliedBrand*"}'
-	
-.LINK
-    TBD
-	
-.NOTES
-	Johann Enquist
-    administrator@boomandfreeze.com
-    6-30-2015
-.EXAMPLE
-    Get-iTopBrand -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_Brand "Cisco"
+  Sends a core/get operation to the iTop REST api. If no brand is supplied, will return all brands. If one is supplied will apply: 
+  
+  '| where {$_.name -like "*SuppliedBrand*"}'
 
+.NOTES
+
+.EXAMPLE
+  Get-iTopBrand -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_Brand "Cisco"
+
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
 #>
   
         [CmdletBinding()]
@@ -84,28 +85,23 @@ return $objData | where {$_.name -like "*$itop_brand*"}
 
 }
 
-
 function Get-iTopLocation {
-  
-  
-  <#
+<#
 .SYNOPSIS
-    Query iTop server for all available Locations and select a Location if one is supplied.
+  Query iTop server for all available Locations and select a Location if one is supplied.
 
 .DESCRIPTION
-	sends a core/get operation to the iTop REST api. If no Location is supplied, will return all Locations. if one is 
-    supplied will apply '| where {$_.name -like "*SuppliedLocation*"}'
-	
-.LINK
-    TBD
-	
-.NOTES
-	Johann Enquist
-    administrator@boomandfreeze.com
-    6-30-2015
-.EXAMPLE
-    Get-iTopLocation -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_Location "DataCenter1"
+  Sends a core/get operation to the iTop REST api. If no Location is supplied, will return all Locations. If one is supplied will apply: 
+  
+  '| where {$_.name -like "*SuppliedLocation*"}'
 
+.NOTES
+
+.EXAMPLE
+  Get-iTopLocation -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_Location "DataCenter1"
+
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
 #>  
         [CmdletBinding()]
          param(
@@ -178,27 +174,23 @@ return $objData | where {$_.name -like "*$itop_name*"}
 
 }
 
-
-function Get-iTopOrganization {
-    
+function Get-iTopOrganization {  
 <#
 .SYNOPSIS
-    Query iTop server for all available Organizations and select a Organization if one is supplied.
+  Query iTop server for all available Organizations and select a Organization if one is supplied.
 
 .DESCRIPTION
-	sends a core/get operation to the iTop REST api. If no Organization is supplied, will return all Organizations. if one is 
-    supplied will apply '| where {$_.name -like "*SuppliedOrganization*"}'
-	
-.LINK
-    TBD
-	
-.NOTES
-	Johann Enquist
-    administrator@boomandfreeze.com
-    6-30-2015
-.EXAMPLE
-    Get-iTopOrganization -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "My Company/Department"
+  Sends a core/get operation to the iTop REST api. If no Organization is supplied, will return all Organizations. If one is supplied, will apply:
+  
+  '| where {$_.name -like "*SuppliedOrganization*"}'
 
+.NOTES
+
+.EXAMPLE
+  Get-iTopOrganization -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "My Company/Department"
+
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
 #>  
         [CmdletBinding()]
          param(
@@ -269,27 +261,23 @@ return $objData | where {$_.name -like "*$itop_name*"}
 
 }
 
-
-function Get-iTopModel {
-    
+function Get-iTopModel { 
 <#
 .SYNOPSIS
-    Query iTop server for all available Models and select a Model if one is supplied.
+  Query iTop server for all available Models and select a Model if one is supplied.
 
 .DESCRIPTION
-	sends a core/get operation to the iTop REST api. If no Model is supplied, will return all Models. if one is 
-    supplied will apply '| where {$_.name -like "*SuppliedModel*"}'
-	
-.LINK
-    TBD
-	
-.NOTES
-	Johann Enquist
-    administrator@boomandfreeze.com
-    6-30-2015
-.EXAMPLE
-    Get-iTopModel -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "WS-C2960C"
+  Sends a core/get operation to the iTop REST api. If no Model is supplied, will return all Models. If one is supplied, will apply: 
+  
+  '| where {$_.name -like "*SuppliedModel*"}'
 
+.NOTES
+
+.EXAMPLE
+  Get-iTopModel -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "WS-C2960C"
+
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
 #>  
         [CmdletBinding()]
          param(
@@ -354,27 +342,23 @@ return $objData | where {$_.name -like "*$itop_name*"}
 
 }
 
-
-function Get-iTopIOSVersion {
-    
+function Get-iTopIOSVersion {  
 <#
 .SYNOPSIS
-    Query iTop server for all available IOSVersion and select a IOSVersions if one is supplied.
+  Query iTop server for all available IOSVersion and select a IOSVersions if one is supplied.
 
 .DESCRIPTION
-	sends a core/get operation to the iTop REST api. If no IOSVersion is supplied, will return all IOSVersions. if one is 
-    supplied will apply '| where {$_.name -like "*SuppliedIOSVersion*"}'
-	
-.LINK
-    TBD
-	
-.NOTES
-	Johann Enquist
-    administrator@boomandfreeze.com
-    6-30-2015
-.EXAMPLE
-    Get-iTopIOSVersion -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "Version 15.0(2)EX5"
+  Sends a core/get operation to the iTop REST api. If no IOSVersion is supplied, will return all IOSVersions. If one is supplied, will apply: 
+  
+  '| where {$_.name -like "*SuppliedIOSVersion*"}'
 
+.NOTES
+
+.EXAMPLE
+  Get-iTopIOSVersion -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "Version 15.0(2)EX5"
+
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
 #>  
         [CmdletBinding()]
          param(
@@ -439,25 +423,22 @@ return $objData | where {$_.name -like "*$itop_name*"}
 
 }
 
-
 function New-iTopIOSversion {
 <#
-   .SYNOPSIS
-    Post core/create to iTop server for new IOSVersion and return IOSVersion name and key.
+.SYNOPSIS
+  Post core/create to iTop server for new IOSVersion and return IOSVersion name and key.
 
 .DESCRIPTION
-	sends a core/create operation to the iTop REST api. Currently does not check for duplicate name, just creates another object with the info you supply.
-    Will lookup brand_ID if brand_name is supplied but brand_id is not.
-	
-.LINK
-    TBD
-	
+  Sends a core/create operation to the iTop REST api. Currently does not check for duplicate name, just creates another object with the info you supply.
+  Will lookup brand_ID if brand_name is supplied but brand_id is not.
+
 .NOTES
-	Johann Enquist
-    administrator@boomandfreeze.com
-    6-30-2015
-    
-.EXAMPLE New-iTopIOSversion -Credential $Credential -ServerAddress itop.isd625.sppsmn.int -Protocol https -itop_IOSname "Version 12.2(25)SEE3" -itop_brand_name "Cisco" -itop_brand_id "2"
+  
+.EXAMPLE 
+  New-iTopIOSversion -Credential $Credential -ServerAddress itop.isd625.sppsmn.int -Protocol https -itop_IOSname "Version 12.2(25)SEE3" -itop_brand_name "Cisco" -itop_brand_id "2"
+
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
 #>
         [CmdletBinding()]
          param(
@@ -608,25 +589,22 @@ if(![string]::IsNullOrEmpty($objIosVer["$modifiedName"])){
 
 }
 
-
 function New-iTopLocation {
-   <#
-   .SYNOPSIS
-    Post core/create to iTop server for new Location and return all Location fields.
+<#
+.SYNOPSIS
+  Post core/create to iTop server for new Location and return all Location fields.
 
 .DESCRIPTION
-	sends a core/create operation to the iTop REST api. Currently does not check for duplicate names, just creates another object with the info you supply.
-    Will lookup org_ID if organization_name is supplied but org_id is not.
-	
-.LINK
-    TBD
-	
+  Sends a core/create operation to the iTop REST api. Currently does not check for duplicate names, just creates another object with the info you supply.
+  Will lookup org_ID if organization_name is supplied but org_id is not.
+
 .NOTES
-	Johann Enquist
-    administrator@boomandfreeze.com
-    6-30-2015
-    
-.EXAMPLE New-iTopLocation -Credential $Credential -ServerAddress itop.isd625.sppsmn.int -Protocol https -itop_IOSname "LocationName" -itop_status "active" -itop_org_id "2" -itop_org_name "My Company/Department" -itop_address "123 Fake St." -$itop_postal_code "123456" -itop_city "Minneapolis" -itop_country "United States"
+  
+.EXAMPLE 
+  New-iTopLocation -Credential $Credential -ServerAddress itop.isd625.sppsmn.int -Protocol https -itop_IOSname "LocationName" -itop_status "active" -itop_org_id "2" -itop_org_name "My Company/Department" -itop_address "123 Fake St." -$itop_postal_code "123456" -itop_city "Minneapolis" -itop_country "United States"
+  
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
 #>
    
 
@@ -784,7 +762,6 @@ $CreateLocation = $CreateLocation | ConvertTo-Json -Compress
    
 
 }
-
 
 function New-iTopNetDevice {
     
