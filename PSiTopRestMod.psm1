@@ -25,7 +25,6 @@ function Get-iTopBrand {
 #> 
 [CmdletBinding()]
 param(    
-  #Path to Tab Delimited user import file.
   [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
   [string]$ServerAddress,
   [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
