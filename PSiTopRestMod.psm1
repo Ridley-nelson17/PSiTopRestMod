@@ -22,67 +22,55 @@ function Get-iTopBrand {
 
 .LINK
   https://github.com/jenquist/PSiTopRestMod
-#>
-  
-        [CmdletBinding()]
-         param(
-             
-             #Path to Tab Delimited user import file.
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$ServerAddress,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$Protocol="https",
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [PSCredential]$Credential,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_Brand = "*"
+#> 
+[CmdletBinding()]
+param(    
+  #Path to Tab Delimited user import file.
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$Protocol="https",
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$iTopBrand = "*"
+)
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
 
-             )
-             
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
 
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get'
+               class = 'Brand'
+               key = ("SELECT Brand")
+               output_fields= 'name,finalclass'
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
 
+  # Generate REST URI
+  $uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
 
-[string]$username = $Credential.UserName
-[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
 
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+  # Convert returned JSON into easily consumable PowerShell objects
+  $objData = @()
+  foreach ($name in ($returnedJSON.objects | Get-Member -MemberType Properties).Name){
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                  'finalclass'=$returnedJSON.objects.$name.fields.finalclass
+                                  'key'=$returnedJSON.objects.$name.key}
+  }
 
-$sendJSON = @{
-             operation = 'core/get';
-             class = 'Brand';
-             key = ("SELECT Brand");
-             output_fields= 'name,finalclass';
-             } | ConvertTo-Json -Compress
-
-
-#generate ReST URI
-$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$sendJSON"
-#$uri
-
-
-
-
-#execute command ans store returned JSON
-$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
-
-$objData = @()
-
-foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
-    
-
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name name -Value ($returnedJSON.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name finalclass -Value ($returnedJSON.objects.$name.fields.finalclass)
-    $type | Add-Member -type NoteProperty -name Key -Value ($returnedJSON.objects.$name.key)
-    
-   $objData += $type
-
-}
-
-return $objData | where {$_.name -like "*$itop_brand*"}
-
+  # Run where block for specific query
+  # Should have a proper JSON query doing the filter for us on the API end in future
+  $objData | where {$_.name -like "*$iTopBrand*"}
 }
 
 function Get-iTopLocation {
