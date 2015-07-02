@@ -9,17 +9,13 @@ function Get-iTopBrand {
 <#
 .SYNOPSIS
   Query iTop server for all available Brands and select a brand if one is supplied.
-
 .DESCRIPTION
   Sends a core/get operation to the iTop REST api. If no brand is supplied, will return all brands. If one is supplied will apply: 
   
-  '| where {$_.name -like "*SuppliedBrand*"}'
-
+  '"SELECT Brand WHERE name = " + "'" +$iTopBrand + "'"'
 .NOTES
-
 .EXAMPLE
   Get-iTopBrand -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_Brand "Cisco"
-
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #> 
@@ -58,6 +54,8 @@ param(
 
   # Execute command and store returned JSON
   $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
 
   # Convert returned JSON into easily consumable PowerShell objects
   $objData = @()
@@ -68,7 +66,7 @@ param(
   }
 
   # Run where block for specific query
-  # Should have a proper JSON query doing the filter for us on the API end in future
+  # Should have a proper JSON query doing the filter for us on the API end in future -- Done?
   $objData | where {$_.name -like "*$iTopBrand*"}
 }
 
@@ -76,17 +74,13 @@ function Get-iTopLocation {
 <#
 .SYNOPSIS
   Query iTop server for all available Locations and select a Location if one is supplied.
-
 .DESCRIPTION
   Sends a core/get operation to the iTop REST api. If no Location is supplied, will return all Locations. If one is supplied will apply: 
   
   '| where {$_.name -like "*SuppliedLocation*"}'
-
 .NOTES
-
 .EXAMPLE
   Get-iTopLocation -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_Location "DataCenter1"
-
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>  
@@ -121,43 +115,40 @@ $sendJSON = @{
              key = ("SELECT Location");
              output_fields= '*';
              } | ConvertTo-Json -Compress
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
 
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+Write-Verbose "REST URI: $uri"
 
-#generate ReST URI
-$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$sendJSON"
-#$uri
-
-
-
-
-#execute command ans store returned JSON
+# Execute command and store returned JSON
 $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$returnedJSON"
 
+#parse server response and build a better(Non-nested) object
 $objData = @()
 
 foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
     
-
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name name -Value ($returnedJSON.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name status -Value ($returnedJSON.objects.$name.fields.status)
-    $type | Add-Member -type NoteProperty -name org_id -Value ($returnedJSON.objects.$name.fields.org_id)
-    $type | Add-Member -type NoteProperty -name org_name -Value ($returnedJSON.objects.$name.fields.org_name)
-    $type | Add-Member -type NoteProperty -name address -Value ($returnedJSON.objects.$name.fields.address)
-    $type | Add-Member -type NoteProperty -name postal_code -Value ($returnedJSON.objects.$name.fields.postal_code)
-    $type | Add-Member -type NoteProperty -name city -Value ($returnedJSON.objects.$name.fields.city)
-    $type | Add-Member -type NoteProperty -name country -Value ($returnedJSON.objects.$name.fields.country)
-    $type | Add-Member -type NoteProperty -name physicaldevice_list -Value ($returnedJSON.objects.$name.fields.physicaldevice_list)
-    $type | Add-Member -type NoteProperty -name person_list -Value ($returnedJSON.objects.$name.fields.person_list)
-    $type | Add-Member -type NoteProperty -name friendlyname -Value ($returnedJSON.objects.$name.fields.friendlyname)
-    $type | Add-Member -type NoteProperty -name org_id_friendlyname -Value ($returnedJSON.objects.$name.fields.org_id_friendlyname)
-    $type | Add-Member -type NoteProperty -name Key -Value ($returnedJSON.objects.$name.key)
-    
-   $objData += $type
+   $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                  'status'=$returnedJSON.objects.$name.fields.status
+                                  'org_id'=$returnedJSON.objects.$name.fields.org_id
+                                  'org_name'=$returnedJSON.objects.$name.fields.org_name
+                                  'address'=$returnedJSON.objects.$name.fields.address
+                                  'postal_code'=$returnedJSON.objects.$name.fields.postal_code
+                                  'city'=$returnedJSON.objects.$name.fields.city
+                                  'country'=$returnedJSON.objects.$name.fields.country
+                                  'physicaldevice_list'=$returnedJSON.objects.$name.fields.physicaldevice_list
+                                  'person_list'=$returnedJSON.objects.$name.fields.person_list
+                                  'friendlyname'=$returnedJSON.objects.$name.fields.friendlyname
+                                  'org_id_friendlyname'=$returnedJSON.objects.$name.fields.org_id_friendlyname
+                                  'key'=$returnedJSON.objects.$name.key}
 
 }
 
-return $objData | where {$_.name -like "*$itop_name*"}
+return $objData | where {$_.name -like "*$itop_Name*"}
 
 }
 
@@ -165,17 +156,13 @@ function Get-iTopOrganization {
 <#
 .SYNOPSIS
   Query iTop server for all available Organizations and select a Organization if one is supplied.
-
 .DESCRIPTION
   Sends a core/get operation to the iTop REST api. If no Organization is supplied, will return all Organizations. If one is supplied, will apply:
   
   '| where {$_.name -like "*SuppliedOrganization*"}'
-
 .NOTES
-
 .EXAMPLE
   Get-iTopOrganization -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "My Company/Department"
-
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>  
@@ -207,44 +194,41 @@ $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
 $sendJSON = @{
              operation = 'core/get';
              class = 'Organization';
-             key = 'SELECT Organization';
+             key = ("SELECT Organization");;
              output_fields= '*';
              } | ConvertTo-Json -Compress
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
 
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+Write-Verbose "REST URI: $uri"
 
-#generate ReST URI
-$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$sendJSON"
-#$uri
-
-
-
-
-#execute command ans store returned JSON
+# Execute command and store returned JSON
 $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$returnedJSON"
 
+#parse server response and build a better(Non-nested) object
 $objData = @()
 
 foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
     
-
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name name -Value ($returnedJSON.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name code -Value ($returnedJSON.objects.$name.fields.code)
-    $type | Add-Member -type NoteProperty -name parent_id -Value ($returnedJSON.objects.$name.fields.parent_id)
-    $type | Add-Member -type NoteProperty -name status -Value ($returnedJSON.objects.$name.fields.status)
-    $type | Add-Member -type NoteProperty -name parent_name -Value ($returnedJSON.objects.$name.fields.parent_name)
-    $type | Add-Member -type NoteProperty -name deliverymodel_id -Value ($returnedJSON.objects.$name.fields.deliverymodel_id)
-    $type | Add-Member -type NoteProperty -name deliverymodel_name -Value ($returnedJSON.objects.$name.fields.deliverymodel_name)
-    $type | Add-Member -type NoteProperty -name friendlyname -Value ($returnedJSON.objects.$name.fields.friendlyname)
-    $type | Add-Member -type NoteProperty -name parent_id_friendlyname -Value ($returnedJSON.objects.$name.fields.parent_id_friendlyname)
-    $type | Add-Member -type NoteProperty -name deliverymodel_id_friendlyname -Value ($returnedJSON.objects.$name.fields.deliverymodel_id_friendlyname)
-    $type | Add-Member -type NoteProperty -name Key -Value ($returnedJSON.objects.$name.key)
-    
-   $objData += $type
+   $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                 'code'=$returnedJSON.objects.$name.fields.code
+                                 'parent_id'=$returnedJSON.objects.$name.fields.parent_id
+                                 'status'=$returnedJSON.objects.$name.fields.status
+                                 'parent_name'=$returnedJSON.objects.$name.fields.parent_name
+                                 'deliverymodel_id'=$returnedJSON.objects.$name.fields.deliverymodel_id
+                                 'deliverymodel_name'=$returnedJSON.objects.$name.fields.deliverymodel_name
+                                 'friendlyname'=$returnedJSON.objects.$name.fields.friendlyname
+                                 'parent_id_friendlyname'=$returnedJSON.objects.$name.fields.parent_id_friendlyname
+                                 'deliverymodel_id_friendlyname'=$returnedJSON.objects.$name.fields.deliverymodel_id_friendlyname
+                                 'key'=$returnedJSON.objects.$name.key}
 
 }
 
-return $objData | where {$_.name -like "*$itop_name*"}
+return $objData | where {$_.name -like "*$itop_org*"}
 
 }
 
@@ -252,17 +236,13 @@ function Get-iTopModel {
 <#
 .SYNOPSIS
   Query iTop server for all available Models and select a Model if one is supplied.
-
 .DESCRIPTION
   Sends a core/get operation to the iTop REST api. If no Model is supplied, will return all Models. If one is supplied, will apply: 
   
   '| where {$_.name -like "*SuppliedModel*"}'
-
 .NOTES
-
 .EXAMPLE
   Get-iTopModel -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "WS-C2960C"
-
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>  
@@ -298,30 +278,29 @@ $sendJSON = @{
              output_fields= 'name,brand_id,brand_name,type';
              } | ConvertTo-Json -Compress
 
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
 
-#generate ReST URI
-$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$sendJSON"
-#$uri
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+Write-Verbose "REST URI: $uri"
 
-
-
-
-#execute command ans store returned JSON
+# Execute command and store returned JSON
 $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$returnedJSON"
 
+#parse server response and build a better(Non-nested) object
 $objData = @()
 
 foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
     
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                 'brand_id'=$returnedJSON.objects.$name.fields.brand_id
+                                 'brand_name'=$returnedJSON.objects.$name.fields.brand_name
+                                 'type'=$returnedJSON.objects.$name.fields.type                               
+                                 'key'=$returnedJSON.objects.$name.key}
 
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name name -Value ($returnedJSON.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name brand_id -Value ($returnedJSON.objects.$name.fields.brand_id)
-    $type | Add-Member -type NoteProperty -name brand_name -Value ($returnedJSON.objects.$name.fields.brand_name)
-    $type | Add-Member -type NoteProperty -name type -Value ($returnedJSON.objects.$name.fields.type)
-    $type | Add-Member -type NoteProperty -name key -Value ($returnedJSON.objects.$name.key)
-
-   $objData += $type
 
 }
 
@@ -333,17 +312,13 @@ function Get-iTopIOSVersion {
 <#
 .SYNOPSIS
   Query iTop server for all available IOSVersion and select a IOSVersions if one is supplied.
-
 .DESCRIPTION
   Sends a core/get operation to the iTop REST api. If no IOSVersion is supplied, will return all IOSVersions. If one is supplied, will apply: 
   
   '| where {$_.name -like "*SuppliedIOSVersion*"}'
-
 .NOTES
-
 .EXAMPLE
   Get-iTopIOSVersion -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "Version 15.0(2)EX5"
-
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>  
@@ -379,30 +354,29 @@ $sendJSON = @{
              output_fields= '*';
              } | ConvertTo-Json -Compress
 
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
 
-#generate ReST URI
-$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$sendJSON"
-#$uri
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+Write-Verbose "REST URI: $uri"
 
-
-
-
-#execute command ans store returned JSON
+# Execute command and store returned JSON
 $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$returnedJSON"
 
+#parse server response and build a better(Non-nested) object
 $objData = @()
 
 foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
     
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                 'brand_id'=$returnedJSON.objects.$name.fields.brand_id
+                                 'brand_name'=$returnedJSON.objects.$name.fields.brand_name
+                                 'finalclass'=$returnedJSON.objects.$name.fields.finalclass                               
+                                 'key'=$returnedJSON.objects.$name.key}
 
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name name -Value ($returnedJSON.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name brand_id -Value ($returnedJSON.objects.$name.fields.brand_id)
-    $type | Add-Member -type NoteProperty -name brand_name -Value ($returnedJSON.objects.$name.fields.brand_name)
-    $type | Add-Member -type NoteProperty -name finalclass -Value ($returnedJSON.objects.$name.fields.finalclass)
-    $type | Add-Member -type NoteProperty -name key -Value ($returnedJSON.objects.$name.key)
-
-   $objData += $type
 
 }
 
@@ -414,16 +388,13 @@ function New-iTopIOSversion {
 <#
 .SYNOPSIS
   Post core/create to iTop server for new IOSVersion and return IOSVersion name and key.
-
 .DESCRIPTION
   Sends a core/create operation to the iTop REST api. Currently does not check for duplicate name, just creates another object with the info you supply.
   Will lookup brand_ID if brand_name is supplied but brand_id is not.
-
 .NOTES
   
 .EXAMPLE 
   New-iTopIOSversion -Credential $Credential -ServerAddress itop.isd625.sppsmn.int -Protocol https -itop_IOSname "Version 12.2(25)SEE3" -itop_brand_name "Cisco" -itop_brand_id "2"
-
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>
@@ -509,18 +480,14 @@ if(![string]::IsNullOrEmpty($objIosVer["$modifiedName"])){
 
     foreach ($name in (($brand.objects | Get-Member -MemberType NoteProperty).Name))
         {
-    
-
-        $type = New-Object System.Object 
-        $type | Add-Member -type NoteProperty -name Name -Value ($brand.objects.$name.fields.name)
-        $type | Add-Member -type NoteProperty -name DeviceTypeKey -Value ($brand.objects.$name.key)
-    
-        $objBrand += $type
+        $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                                                            
+                                      'key'=$returnedJSON.objects.$name.key}    
+        
 
         }
 
 
-    $itop_brand_id = $objBrand[0].DeviceTypeKey
+    $itop_brand_id = $objBrand[0].key
 
 
     }
@@ -556,13 +523,10 @@ if(![string]::IsNullOrEmpty($objIosVer["$modifiedName"])){
     $objData = @()
 
     foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
-    
+        
+        $objData += [PSCustomObject]@{'friendlyname'=$returnedJSON.objects.$name.fields.name                                                            
+                                      'key'=$returnedJSON.objects.$name.key}    
 
-        $type = New-Object System.Object 
-        $type | Add-Member -type NoteProperty -name friendlyname -Value ($returnedJSON.objects.$name.fields.friendlyname)
-        $type | Add-Member -type NoteProperty -name key -Value ($returnedJSON.objects.$name.key)
-    
-       $objData += $type
 
     }
 
@@ -580,11 +544,9 @@ function New-iTopLocation {
 <#
 .SYNOPSIS
   Post core/create to iTop server for new Location and return all Location fields.
-
 .DESCRIPTION
   Sends a core/create operation to the iTop REST api. Currently does not check for duplicate names, just creates another object with the info you supply.
   Will lookup org_ID if organization_name is supplied but org_id is not.
-
 .NOTES
   
 .EXAMPLE 
@@ -657,12 +619,9 @@ $objOrg = @()
 foreach ($name in (($org.objects | Get-Member -MemberType NoteProperty).Name))
     {
     
+    $objOrg += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                            
+                                  'key'=$returnedJSON.objects.$name.key}
 
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name Name -Value ($org.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name Key -Value ($org.objects.$name.key)
-    
-    $objOrg += $type
 
     }
 
@@ -720,23 +679,19 @@ $CreateLocation = $CreateLocation | ConvertTo-Json -Compress
 
     foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
     
-
-        $type = New-Object System.Object 
-        $type | Add-Member -type NoteProperty -name name -Value ($returnedJSON.objects.$name.fields.name)
-        $type | Add-Member -type NoteProperty -name status -Value ($returnedJSON.objects.$name.fields.status)
-        $type | Add-Member -type NoteProperty -name org_id -Value ($returnedJSON.objects.$name.fields.org_id)
-        $type | Add-Member -type NoteProperty -name org_name -Value ($returnedJSON.objects.$name.fields.org_name)
-        $type | Add-Member -type NoteProperty -name address -Value ($returnedJSON.objects.$name.fields.address)
-        $type | Add-Member -type NoteProperty -name postal_code -Value ($returnedJSON.objects.$name.fields.postal_code)
-        $type | Add-Member -type NoteProperty -name city -Value ($returnedJSON.objects.$name.fields.city)
-        $type | Add-Member -type NoteProperty -name country -Value ($returnedJSON.objects.$name.fields.country)
-        $type | Add-Member -type NoteProperty -name physicaldevice_list -Value ($returnedJSON.objects.$name.fields.physicaldevice_list)
-        $type | Add-Member -type NoteProperty -name person_list -Value ($returnedJSON.objects.$name.fields.person_list)
-        $type | Add-Member -type NoteProperty -name friendlyname -Value ($returnedJSON.objects.$name.fields.friendlyname)
-        $type | Add-Member -type NoteProperty -name org_id_friendlyname -Value ($returnedJSON.objects.$name.fields.org_id_friendlyname)
-        $type | Add-Member -type NoteProperty -name Key -Value ($returnedJSON.objects.$name.key)
-    
-       $objData += $type
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name    
+                                  'status'=$returnedJSON.objects.$name.fields.status
+                                  'org_id'=$returnedJSON.objects.$name.fields.org_id
+                                  'org_name'=$returnedJSON.objects.$name.fields.org_name
+                                  'address'=$returnedJSON.objects.$name.fields.address
+                                  'postal_code'=$returnedJSON.objects.$name.fields.postal_code
+                                  'city'=$returnedJSON.objects.$name.fields.city
+                                  'country'=$returnedJSON.objects.$name.fields.country
+                                  'physicaldevice_list'=$returnedJSON.objects.$name.fields.physicaldevice_list
+                                  'person_list'=$returnedJSON.objects.$name.fields.person_list  
+                                  'friendlyname'=$returnedJSON.objects.$name.fields.friendlyname
+                                  'org_id_friendlyname'=$returnedJSON.objects.$name.fields.org_id_friendlyname                      
+                                  'key'=$returnedJSON.objects.$name.key}
 
     }
 
@@ -806,7 +761,6 @@ function New-iTopNetDevice {
               ) 
 
 <# Possible fields
-
 name                              : 
 description                       : 
 org_id                            : 
@@ -865,8 +819,6 @@ powerB_id_friendlyname            :
 powerB_id_finalclass_recall       : 
 networkdevicetype_id_friendlyname : 
 iosversion_id_friendlyname        : 
-
-
 #>
 
 #Convert Valid IP Back to string
@@ -920,17 +872,13 @@ $objBrand = @()
 foreach ($name in (($brand.objects | Get-Member -MemberType NoteProperty).Name))
     {
     
-
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name Name -Value ($brand.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name DeviceTypeKey -Value ($brand.objects.$name.key)
-    
-    $objBrand += $type
+    $objBrand += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                  
+                                  'key'=$returnedJSON.objects.$name.key}
 
     }
 
 
-$itop_brand_id = $objBrand[0].DeviceTypeKey
+$itop_brand_id = $objBrand[0].key
 
 
 }
@@ -957,17 +905,13 @@ $objIOS = @()
 foreach ($name in (($ios.objects | Get-Member -MemberType NoteProperty).Name))
     {
     
-
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name Name -Value ($ios.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name DeviceTypeKey -Value ($ios.objects.$name.key)
-    
-    $objIOS += $type
+    $objIOS += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                  
+                                  'key'=$returnedJSON.objects.$name.key}
 
     }
 
 
-$itop_iosversion_id = $objIOS[0].DeviceTypeKey
+$itop_iosversion_id = $objIOS[0].key
 
 
 }
@@ -990,13 +934,8 @@ $objOrg = @()
 
 foreach ($name in (($org.objects | Get-Member -MemberType NoteProperty).Name))
     {
-    
-
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name Name -Value ($org.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name Key -Value ($org.objects.$name.key)
-    
-    $objOrg += $type
+    $objOrg += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                  
+                                 'key'=$returnedJSON.objects.$name.key}
 
     }
 
@@ -1023,13 +962,8 @@ $objModel = @()
 
 foreach ($name in (($model.objects | Get-Member -MemberType NoteProperty).Name))
     {
-    
-
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name Name -Value ($model.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name Key -Value ($model.objects.$name.key)
-    
-    $objModel += $type
+    $objModel += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                  
+                                   'key'=$returnedJSON.objects.$name.key}    
 
     }
 
@@ -1058,12 +992,8 @@ $objnetDevID = @()
 foreach ($name in (($netDevID.objects | Get-Member -MemberType NoteProperty).Name))
     {
     
-
-    $type = New-Object System.Object 
-    $type | Add-Member -type NoteProperty -name Name -Value ($netDevID.objects.$name.fields.name)
-    $type | Add-Member -type NoteProperty -name Key -Value ($netDevID.objects.$name.key)
-    
-    $objnetDevID += $type
+    $objnetDevID += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                  
+                                      'key'=$returnedJSON.objects.$name.key}  
 
     }
 
@@ -1085,7 +1015,8 @@ $variables = @((get-help New-iTopNetDevice -Parameter *).name)
 #add each parameter function to fields HT that starts with iTop and is not null or empty
 foreach ($var in $variables) {
     
-    if (($var -like "itop_*") -and (![string]::IsNullOrEmpty((Get-Variable $var -ValueOnly)))){
+    if (($var -like "itop_*") -and (![string]::IsNullOrEmpty((Get-Variable $var -ValueOnly))))
+    {
         
         $name = ($var).Replace('itop_','')
         
@@ -1124,13 +1055,9 @@ if($returnedJSON.message -like "Error*"){
     $objData = @()
 
     foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
-    
-
-        $type = New-Object System.Object 
-        $type | Add-Member -type NoteProperty -name name -Value ($returnedJSON.objects.$name.fields.name)
-        $type | Add-Member -type NoteProperty -name key -Value ($returnedJSON.objects.$name.key)
-    
-       $objData += $type
+        
+        $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                  
+                                      'key'=$returnedJSON.objects.$name.key}
 
     }
 
@@ -1144,4 +1071,3 @@ if($returnedJSON.message -like "Error*"){
     $base64AuthInfo = $null
     $headers = $null
 }
-
