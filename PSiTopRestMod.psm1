@@ -152,6 +152,229 @@ return $objData | where {$_.name -like "*$itop_Name*"}
 
 }
 
+function Get-iTopOSFamily { 
+<#
+.SYNOPSIS
+  Query iTop server for all available OSFamilies and select a OSFamily if one is supplied.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST api. If no OSFamily is supplied, will return all OSFamilies. If one is supplied, will apply: 
+  
+  '| where {$_.name -like "*SuppliedModel*"}'
+.NOTES
+.EXAMPLE
+  Get-iTopOSFamily -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "Windows"
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#>  
+        [CmdletBinding()]
+         param(
+             
+             #Path to Tab Delimited user import file.
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [string]$ServerAddress,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$Protocol="https",
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [PSCredential]$Credential,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$itop_name = "*"
+
+             )
+             
+
+
+
+[string]$username = $Credential.UserName
+[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+$sendJSON = @{
+             operation = 'core/get';
+             class = 'OSFamily';
+             key = 'SELECT OSFamily';
+             output_fields= '*';
+             } | ConvertTo-Json -Compress
+
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
+
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+Write-Verbose "REST URI: $uri"
+
+# Execute command and store returned JSON
+$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$returnedJSON"
+
+#parse server response and build a better(Non-nested) object
+$objData = @()
+
+foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
+    
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                 'finalclass'=$returnedJSON.objects.$name.fields.finalclass
+                                 'friendlyname'=$returnedJSON.objects.$name.fields.friendlyname                          
+                                 'key'=$returnedJSON.objects.$name.key}
+
+
+}
+
+return $objData | where {$_.name -like "*$itop_name*"}
+
+}
+
+function Get-iTopOSVersion { 
+<#
+.SYNOPSIS
+  Query iTop server for all available OSVersions and select a OSVersion if one is supplied.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST api. If no OSVersion is supplied, will return all OSVersions. If one is supplied, will apply: 
+  
+  '| where {$_.name -like "*SuppliedModel*"}'
+.NOTES
+.EXAMPLE
+  Get-iTopOSFamily -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "Windows"
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#>  
+        [CmdletBinding()]
+         param(
+             
+             #Path to Tab Delimited user import file.
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [string]$ServerAddress,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$Protocol="https",
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [PSCredential]$Credential,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$itop_name = "*"
+
+             )
+             
+
+
+
+[string]$username = $Credential.UserName
+[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+$sendJSON = @{
+             operation = 'core/get';
+             class = 'OSVersion';
+             key = 'SELECT OSVersion';
+             output_fields= '*';
+             } | ConvertTo-Json -Compress
+
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
+
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+Write-Verbose "REST URI: $uri"
+
+# Execute command and store returned JSON
+$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$returnedJSON"
+
+#parse server response and build a better(Non-nested) object
+$objData = @()
+
+foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
+    
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                 'finalclass'=$returnedJSON.objects.$name.fields.finalclass
+                                 'friendlyname'=$returnedJSON.objects.$name.fields.friendlyname                          
+                                 'key'=$returnedJSON.objects.$name.key}
+
+
+}
+
+return $objData | where {$_.name -like "*$itop_name*"}
+
+}
+
+function Get-iTopNetworkDeviceType { 
+<#
+.SYNOPSIS
+  Query iTop server for all available NetworkDeviceTypes and select a NetworkDeviceType if one is supplied.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST api. If no NetworkDeviceType is supplied, will return all NetworkDeviceTypes. If one is supplied, will apply: 
+  
+  '| where {$_.name -like "*SuppliedModel*"}'
+.NOTES
+.EXAMPLE
+  Get-iTopNetworkDeviceType -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "Switch"
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#>  
+        [CmdletBinding()]
+         param(
+             
+             #Path to Tab Delimited user import file.
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [string]$ServerAddress,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$Protocol="https",
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [PSCredential]$Credential,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$itop_name = "*"
+
+             )
+             
+
+
+
+[string]$username = $Credential.UserName
+[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+$sendJSON = @{
+             operation = 'core/get';
+             class = 'NetworkDeviceType';
+             key = 'SELECT NetworkDeviceType';
+             output_fields= 'name';
+             } | ConvertTo-Json -Compress
+
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
+
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+Write-Verbose "REST URI: $uri"
+
+# Execute command and store returned JSON
+$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$returnedJSON"
+
+#parse server response and build a better(Non-nested) object
+$objData = @()
+
+foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
+    
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                        
+                                 'key'=$returnedJSON.objects.$name.key}
+
+
+}
+
+return $objData | where {$_.name -like "*$itop_name*"}
+
+}
+
 function Get-iTopOrganization {  
 <#
 .SYNOPSIS
@@ -382,6 +605,197 @@ foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty)
 
 return $objData | where {$_.name -like "*$itop_name*"}
 
+}
+
+function Get-iTopContractType { 
+<#
+.SYNOPSIS
+  Query iTop server for all available ContractTypes and select a ContractType if one is supplied.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST api. If no ContractType is supplied, will return all ContractTypes. If one is supplied, will apply: 
+  
+  '| where {$_.name -like "*SuppliedModel*"}'
+.NOTES
+  Only value for this type of object is name.
+.EXAMPLE
+  Get-iTopContractType -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "VendorContract"
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#>  
+        [CmdletBinding()]
+         param(
+             
+             #Path to Tab Delimited user import file.
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [string]$ServerAddress,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$Protocol="https",
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [PSCredential]$Credential,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$itop_name = "*"
+
+             )
+             
+
+
+
+[string]$username = $Credential.UserName
+[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+$sendJSON = @{
+             operation = 'core/get';
+             class = 'ContractType';
+             key = 'SELECT ContractType';
+             output_fields= 'name';
+             } | ConvertTo-Json -Compress
+
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
+
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+Write-Verbose "REST URI: $uri"
+
+# Execute command and store returned JSON
+$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$returnedJSON"
+
+#parse server response and build a better(Non-nested) object
+$objData = @()
+
+foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
+    
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                        
+                                 'key'=$returnedJSON.objects.$name.key}
+
+
+}
+
+return $objData | where {$_.name -like "*$itop_name*"}
+
+}
+
+
+
+
+function New-iTopNetworkDeviceType {
+<#
+.SYNOPSIS
+  Post core/create to iTop server for new NetworkDeviceType and return NetworkDeviceType name and key.
+.DESCRIPTION
+  Sends a core/create operation to the iTop REST api. Currently will check for duplicate name, and return the device found if a duplicate.
+  Will lookup brand_ID if brand_name is supplied but brand_id is not.
+.NOTES
+  
+.EXAMPLE 
+  New-iTopNetworkDeviceType -Credential $Credential -ServerAddress itop.foo.com -Protocol https -itop_name "VoiceGateway"
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#>
+        [CmdletBinding()]
+         param(
+             
+             #Path to Tab Delimited user import file.
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [string]$ServerAddress,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$Protocol="https",
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [PSCredential]$Credential,
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [string]$itop_name
+          
+              ) 
+
+
+
+[string]$username = $Credential.UserName
+[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+
+#cleanup for password
+$password=$null
+
+#Get Vendor Key if null
+
+
+$getNetDevTypes = @{operation = 'core/get';
+              class = 'NetworkDeviceType';
+              key = ("SELECT NetworkDeviceType WHERE name = " + "'" +$itop_name + "'");
+              output_fields= 'name';
+              } | ConvertTo-Json -Compress
+
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
+
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$getNetDevTypes"
+Write-Verbose "REST URI: $uri"
+
+# Execute command and store returned JSON
+$netdevtypeJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$netdevtypeJSON"
+
+if($netdevtypeJSON.message -eq "Found: 0"){
+
+
+
+    $CreateIOS = @{
+       operation='core/create';
+       comment='PowershellAPI';
+       class= 'NetworkDeviceType';
+       fields = @{
+                 name = "$itop_name";
+                 } 
+    }  | ConvertTo-Json -Compress
+
+
+
+
+    #generate ReST URI
+    $uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$CreateIOS"
+    #$uri
+
+
+
+
+    #execute command ans store returned JSON
+    $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+    #$returnedJSON
+
+
+    $objData = @()
+
+    foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
+        
+        $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                                                            
+                                      'key'=$returnedJSON.objects.$name.key}    
+
+
+    }
+
+    return $objData 
+
+} else {
+
+    "DeviceType Exists!"
+    $netdevtypeJSON.objects
+
+    }
+    #cleanup for headers and base64 var
+    $base64AuthInfo = $null
+    $headers = $null
 }
 
 function New-iTopIOSversion {
