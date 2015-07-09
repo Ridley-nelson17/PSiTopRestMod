@@ -755,7 +755,80 @@ return $objData | where {$_.name -like "*$itop_name*"}
 
 }
 
+function Get-iTopDocumentType { 
+<#
+.SYNOPSIS
+  Query iTop server for all available DocumentTypes and select a DocumentType if one is supplied.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST api. If no DocumentType is supplied, will return all DocumentTypes. If one is supplied, will apply: 
+  
+  '| where {$_.name -like "*Suppliedtype*"}'
+.NOTES
+  Only value for this type of object is name.
+.EXAMPLE
+  Get-iTopDocumentType -ServerAddress "itop.foo.com" -Protocol "https" -Credential (get-credential) -itop_name "Building Diagram"
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#>  
+        [CmdletBinding()]
+         param(
+             
+             #Path to Tab Delimited user import file.
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [string]$ServerAddress,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$Protocol="https",
+             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+             [PSCredential]$Credential,
+             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+             [string]$itop_name = "*"
 
+             )
+             
+
+
+
+[string]$username = $Credential.UserName
+[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+$sendJSON = @{
+             operation = 'core/get';
+             class = 'DocumentType';
+             key = 'SELECT DocumentType';
+             output_fields= 'name';
+             } | ConvertTo-Json -Compress
+
+Write-Verbose "Sending JSON..."
+Write-Verbose "$sendJSON"
+
+# Generate REST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+Write-Verbose "REST URI: $uri"
+
+# Execute command and store returned JSON
+$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+Write-Verbose "Server returned: 
+$returnedJSON"
+
+#parse server response and build a better(Non-nested) object
+$objData = @()
+
+foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
+    
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                        
+                                 'key'=$returnedJSON.objects.$name.key
+                                 'class'=$returnedJSON.objects.$name.class}
+
+
+}
+
+return $objData | where {$_.name -like "*$itop_name*"}
+
+}
 
 function New-iTopNetworkDeviceType {
 <#
