@@ -24,7 +24,8 @@ param(
   [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
   [string]$ServerAddress,
   [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-  [string]$Protocol="https",
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
   [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
   [PSCredential]$Credential,
   [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
@@ -91,7 +92,8 @@ function Get-iTopLocation {
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [string]$ServerAddress,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$Protocol="https",
+             [ValidateSet('https','http')]
+             [string]$Protocol='https',
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [PSCredential]$Credential,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
@@ -173,7 +175,8 @@ function Get-iTopOrganization {
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [string]$ServerAddress,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$Protocol="https",
+             [ValidateSet('https','http')]
+             [string]$Protocol='https',
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [PSCredential]$Credential,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
@@ -253,7 +256,8 @@ function Get-iTopModel {
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [string]$ServerAddress,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$Protocol="https",
+             [ValidateSet('https','http')]
+             [string]$Protocol='https',
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [PSCredential]$Credential,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
@@ -329,7 +333,8 @@ function Get-iTopIOSVersion {
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [string]$ServerAddress,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$Protocol="https",
+             [ValidateSet('https','http')]
+             [string]$Protocol='https',
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [PSCredential]$Credential,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
@@ -405,7 +410,8 @@ function New-iTopNetModel {
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [string]$ServerAddress,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$Protocol="https",
+             [ValidateSet('https','http')]
+             [string]$Protocol='https',
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [PSCredential]$Credential,
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
@@ -554,7 +560,8 @@ function New-iTopIOSversion {
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [string]$ServerAddress,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$Protocol="https",
+             [ValidateSet('https','http')]
+             [string]$Protocol='https',
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [PSCredential]$Credential,
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
@@ -713,7 +720,8 @@ function New-iTopLocation {
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [string]$ServerAddress,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$Protocol="https",
+             [ValidateSet('https','http')]
+             [string]$Protocol='https',
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [PSCredential]$Credential,
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
@@ -863,7 +871,8 @@ function New-iTopNetDevice {
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [string]$ServerAddress,
              [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$Protocol="https",
+             [ValidateSet('https','http')]
+             [string]$Protocol='https',
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
              [PSCredential]$Credential,
              [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
