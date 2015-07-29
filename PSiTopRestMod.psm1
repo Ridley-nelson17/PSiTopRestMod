@@ -58,6 +58,12 @@ param(
   Write-Verbose "Server returned: 
   $returnedJSON"
 
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
+
   # Convert returned JSON into easily consumable PowerShell objects by
   # Parsing server response to build a non-nested object
   $objData = @()
@@ -123,6 +129,12 @@ param(
   $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
   Write-Verbose "Server returned: 
   $returnedJSON"
+
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
 
   # Convert returned JSON into easily consumable PowerShell objects by
   # Parsing server response to build a non-nested object
@@ -201,6 +213,12 @@ param(
   Write-Verbose "Server returned: 
   $returnedJSON"
 
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
+
   # Convert returned JSON into easily consumable PowerShell objects by
   # Parsing server response to build a non-nested object
   $objData = @()
@@ -275,6 +293,12 @@ param(
   Write-Verbose "Server returned: 
   $returnedJSON"
 
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
+
   # Convert returned JSON into easily consumable PowerShell objects by
   # Parsing server response to build a non-nested object
   $objData = @()
@@ -342,6 +366,12 @@ param(
   $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
   Write-Verbose "Server returned: 
   $returnedJSON"
+
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
 
   # Convert returned JSON into easily consumable PowerShell objects by
   # Parsing server response to build a non-nested object
