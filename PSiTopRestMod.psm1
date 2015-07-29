@@ -50,7 +50,7 @@ param(
   Write-Verbose "$sendJSON"
 
   # Generate REST URI
-  $uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
   Write-Verbose "REST URI: $uri"
 
   # Execute command and store returned JSON
@@ -58,7 +58,8 @@ param(
   Write-Verbose "Server returned: 
   $returnedJSON"
 
-  # Convert returned JSON into easily consumable PowerShell objects
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
   $objData = @()
   foreach ($name in ($returnedJSON.objects | Get-Member -MemberType Properties).Name){
     $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
@@ -67,7 +68,6 @@ param(
   }
 
   # Run where block for specific query
-  # Should have a proper JSON query doing the filter for us on the API end in future -- Done?
   $objData | where {$_.name -like "*$iTopBrand*"}
 }
 
@@ -85,56 +85,50 @@ function Get-iTopLocation {
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>  
-        [CmdletBinding()]
-         param(
-             
-             #Path to Tab Delimited user import file.
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$ServerAddress,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [ValidateSet('https','http')]
-             [string]$Protocol='https',
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [PSCredential]$Credential,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_Name = "*"
+[CmdletBinding()]
+param( 
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_Name = "*"
+)         
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
 
-             )
-             
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
 
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get';
+               class = 'Location';
+               key = ("SELECT Location");
+               output_fields= '*';
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
 
+  # Generate REST URI
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
 
-[string]$username = $Credential.UserName
-[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
 
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
-
-$sendJSON = @{
-             operation = 'core/get';
-             class = 'Location';
-             key = ("SELECT Location");
-             output_fields= '*';
-             } | ConvertTo-Json -Compress
-Write-Verbose "Sending JSON..."
-Write-Verbose "$sendJSON"
-
-# Generate REST URI
-$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
-Write-Verbose "REST URI: $uri"
-
-# Execute command and store returned JSON
-$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
-Write-Verbose "Server returned: 
-$returnedJSON"
-
-#parse server response and build a better(Non-nested) object
-$objData = @()
-
-foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
-    
-   $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
+  $objData = @()
+  foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
                                   'status'=$returnedJSON.objects.$name.fields.status
                                   'org_id'=$returnedJSON.objects.$name.fields.org_id
                                   'org_name'=$returnedJSON.objects.$name.fields.org_name
@@ -148,10 +142,10 @@ foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty)
                                   'org_id_friendlyname'=$returnedJSON.objects.$name.fields.org_id_friendlyname
                                   'key'=$returnedJSON.objects.$name.key}
 
-}
+  }
 
-return $objData | where {$_.name -like "*$itop_Name*"}
-
+  # Run where block for specific query
+  $objData | where {$_.name -like "*$itop_Name*"}
 }
 
 function Get-iTopOrganization {  
@@ -168,71 +162,64 @@ function Get-iTopOrganization {
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>  
-        [CmdletBinding()]
-         param(
-             
-             #Path to Tab Delimited user import file.
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$ServerAddress,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [ValidateSet('https','http')]
-             [string]$Protocol='https',
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [PSCredential]$Credential,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_org = "*"
+[CmdletBinding()]
+param( 
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_org = "*"
+)
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
 
-             )
-             
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
 
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get';
+               class = 'Organization';
+               key = ("SELECT Organization");;
+               output_fields= '*';
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
 
+  # Generate REST URI
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
 
-[string]$username = $Credential.UserName
-[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
 
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
-
-$sendJSON = @{
-             operation = 'core/get';
-             class = 'Organization';
-             key = ("SELECT Organization");;
-             output_fields= '*';
-             } | ConvertTo-Json -Compress
-Write-Verbose "Sending JSON..."
-Write-Verbose "$sendJSON"
-
-# Generate REST URI
-$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
-Write-Verbose "REST URI: $uri"
-
-# Execute command and store returned JSON
-$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
-Write-Verbose "Server returned: 
-$returnedJSON"
-
-#parse server response and build a better(Non-nested) object
-$objData = @()
-
-foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
-    
-   $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
-                                 'code'=$returnedJSON.objects.$name.fields.code
-                                 'parent_id'=$returnedJSON.objects.$name.fields.parent_id
-                                 'status'=$returnedJSON.objects.$name.fields.status
-                                 'parent_name'=$returnedJSON.objects.$name.fields.parent_name
-                                 'deliverymodel_id'=$returnedJSON.objects.$name.fields.deliverymodel_id
-                                 'deliverymodel_name'=$returnedJSON.objects.$name.fields.deliverymodel_name
-                                 'friendlyname'=$returnedJSON.objects.$name.fields.friendlyname
-                                 'parent_id_friendlyname'=$returnedJSON.objects.$name.fields.parent_id_friendlyname
-                                 'deliverymodel_id_friendlyname'=$returnedJSON.objects.$name.fields.deliverymodel_id_friendlyname
-                                 'key'=$returnedJSON.objects.$name.key}
-
-}
-
-return $objData | where {$_.name -like "*$itop_org*"}
-
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
+  $objData = @()
+  foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                  'code'=$returnedJSON.objects.$name.fields.code
+                                  'parent_id'=$returnedJSON.objects.$name.fields.parent_id
+                                  'status'=$returnedJSON.objects.$name.fields.status
+                                  'parent_name'=$returnedJSON.objects.$name.fields.parent_name
+                                  'deliverymodel_id'=$returnedJSON.objects.$name.fields.deliverymodel_id
+                                  'deliverymodel_name'=$returnedJSON.objects.$name.fields.deliverymodel_name
+                                  'friendlyname'=$returnedJSON.objects.$name.fields.friendlyname
+                                  'parent_id_friendlyname'=$returnedJSON.objects.$name.fields.parent_id_friendlyname
+                                  'deliverymodel_id_friendlyname'=$returnedJSON.objects.$name.fields.deliverymodel_id_friendlyname
+                                  'key'=$returnedJSON.objects.$name.key}
+  }
+  
+  # Run where block for specific query
+  $objData | where {$_.name -like "*$itop_org*"}
 }
 
 function Get-iTopModel { 
@@ -249,67 +236,58 @@ function Get-iTopModel {
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>  
-        [CmdletBinding()]
-         param(
-             
-             #Path to Tab Delimited user import file.
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$ServerAddress,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [ValidateSet('https','http')]
-             [string]$Protocol='https',
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [PSCredential]$Credential,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_name = "*"
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_name = "*"
+)
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
 
-             )
-             
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
 
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get';
+               class = 'Model';
+               key = 'SELECT Model';
+               output_fields= 'name,brand_id,brand_name,type';
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
 
+  # Generate REST URI
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
 
-[string]$username = $Credential.UserName
-[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
 
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
-
-$sendJSON = @{
-             operation = 'core/get';
-             class = 'Model';
-             key = 'SELECT Model';
-             output_fields= 'name,brand_id,brand_name,type';
-             } | ConvertTo-Json -Compress
-
-Write-Verbose "Sending JSON..."
-Write-Verbose "$sendJSON"
-
-# Generate REST URI
-$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
-Write-Verbose "REST URI: $uri"
-
-# Execute command and store returned JSON
-$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
-Write-Verbose "Server returned: 
-$returnedJSON"
-
-#parse server response and build a better(Non-nested) object
-$objData = @()
-
-foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
-    
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
+  $objData = @()
+  foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
     $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
-                                 'brand_id'=$returnedJSON.objects.$name.fields.brand_id
-                                 'brand_name'=$returnedJSON.objects.$name.fields.brand_name
-                                 'type'=$returnedJSON.objects.$name.fields.type                               
-                                 'key'=$returnedJSON.objects.$name.key}
+                                  'brand_id'=$returnedJSON.objects.$name.fields.brand_id
+                                  'brand_name'=$returnedJSON.objects.$name.fields.brand_name
+                                  'type'=$returnedJSON.objects.$name.fields.type                               
+                                  'key'=$returnedJSON.objects.$name.key}
+  }
 
-
-}
-
-return $objData | where {$_.name -like "*$itop_name*"}
-
+  # Run where block for specific query
+  $objData | where {$_.name -like "*$itop_name*"}
 }
 
 function Get-iTopIOSVersion {  
@@ -326,67 +304,58 @@ function Get-iTopIOSVersion {
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>  
-        [CmdletBinding()]
-         param(
-             
-             #Path to Tab Delimited user import file.
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$ServerAddress,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [ValidateSet('https','http')]
-             [string]$Protocol='https',
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [PSCredential]$Credential,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_name = "*"
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_name = "*"
+)
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
 
-             )
-             
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
 
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get';
+               class = 'IOSVersion';
+               key = 'SELECT IOSVersion';
+               output_fields= '*';
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
 
+  # Generate REST URI
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
 
-[string]$username = $Credential.UserName
-[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
 
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
-
-$sendJSON = @{
-             operation = 'core/get';
-             class = 'IOSVersion';
-             key = 'SELECT IOSVersion';
-             output_fields= '*';
-             } | ConvertTo-Json -Compress
-
-Write-Verbose "Sending JSON..."
-Write-Verbose "$sendJSON"
-
-# Generate REST URI
-$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
-Write-Verbose "REST URI: $uri"
-
-# Execute command and store returned JSON
-$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
-Write-Verbose "Server returned: 
-$returnedJSON"
-
-#parse server response and build a better(Non-nested) object
-$objData = @()
-
-foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
-    
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
+  $objData = @()
+  foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){  
     $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
-                                 'brand_id'=$returnedJSON.objects.$name.fields.brand_id
-                                 'brand_name'=$returnedJSON.objects.$name.fields.brand_name
-                                 'finalclass'=$returnedJSON.objects.$name.fields.finalclass                               
-                                 'key'=$returnedJSON.objects.$name.key}
+                                  'brand_id'=$returnedJSON.objects.$name.fields.brand_id
+                                  'brand_name'=$returnedJSON.objects.$name.fields.brand_name
+                                  'finalclass'=$returnedJSON.objects.$name.fields.finalclass                               
+                                  'key'=$returnedJSON.objects.$name.key}
+  }
 
-
-}
-
-return $objData | where {$_.name -like "*$itop_name*"}
-
+  # Run where block for specific query
+  $objData | where {$_.name -like "*$itop_name*"}
 }
 
 function New-iTopNetModel {
@@ -403,37 +372,33 @@ function New-iTopNetModel {
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>
-        [CmdletBinding()]
-         param(
-             
-             #Path to Tab Delimited user import file.
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$ServerAddress,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [ValidateSet('https','http')]
-             [string]$Protocol='https',
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [PSCredential]$Credential,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_name,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_brand_name,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_type,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_brand_id,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_friendlyname
-              ) 
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_name,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_brand_name,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_type,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_brand_id,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_friendlyname
+) 
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
 
-
-
-[string]$username = $Credential.UserName
-[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
-
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
 
 
 #cleanup for password
@@ -553,34 +518,29 @@ function New-iTopIOSversion {
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>
-        [CmdletBinding()]
-         param(
-             
-             #Path to Tab Delimited user import file.
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$ServerAddress,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [ValidateSet('https','http')]
-             [string]$Protocol='https',
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [PSCredential]$Credential,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_IOSname,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_brand_name,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_brand_id             
-              ) 
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_IOSname,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_brand_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_brand_id             
+) 
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
 
-
-
-[string]$username = $Credential.UserName
-[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
-
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
-
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
 
 #cleanup for password
 $password=$null
@@ -711,45 +671,39 @@ function New-iTopLocation {
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #>
-   
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_status = "active",
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_org_id,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_org_name,   
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_address,    
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_postal_code,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_city,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_country
+) 
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
 
-        [CmdletBinding()]
-         param(
-             
-             #Path to Tab Delimited user import file.
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$ServerAddress,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [ValidateSet('https','http')]
-             [string]$Protocol='https',
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [PSCredential]$Credential,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_name,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_status = "active",
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_org_id,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_org_name,   
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_address,    
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_postal_code,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_city,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_country
-              ) 
-
-
-
-[string]$username = $Credential.UserName
-[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
-$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
-
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
 
 
 #cleanup for password
@@ -862,61 +816,57 @@ $CreateLocation = $CreateLocation | ConvertTo-Json -Compress
 
 }
 
-function New-iTopNetDevice {
-    
-        [CmdletBinding()]
-         param(
-             
-             #Path to Tab Delimited user import file.
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$ServerAddress,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [ValidateSet('https','http')]
-             [string]$Protocol='https',
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [PSCredential]$Credential,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_name,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_description,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_org_id,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_organization_name,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_brand_name,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_business_criticity = "low",
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_brand_id,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_friendlyname = $itop_name,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_serialnumber,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_location_id = 0,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_location_name,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_status,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_model_id,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_model_name,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_asset_number,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_iosversion_id,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_iosversion_name,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [ipaddress]$itop_managementip,
-             [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
-             [string]$itop_networkdevicetype_name,
-             [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-             [string]$itop_networkdevicetype_id
-
-              ) 
+function New-iTopNetDevice { 
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_description,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_org_id,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_organization_name,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_brand_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_business_criticity = "low",
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_brand_id,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_friendlyname = $itop_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_serialnumber,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_location_id = 0,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_location_name,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_status,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_model_id,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_model_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_asset_number,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_iosversion_id,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_iosversion_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ipaddress]$itop_managementip,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_networkdevicetype_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_networkdevicetype_id
+) 
 
 <# Possible fields
 name                              : 
@@ -982,17 +932,13 @@ iosversion_id_friendlyname        :
 #Convert Valid IP Back to string
 $itop_managementip = $itop_managementip.IPAddressToString
 
-
-
-
-#Build headers for invoke-restmethod authentication
+# Creating header with credentials being used for authentication
 [string]$username = $Credential.UserName
 [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
 $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
 
 $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
-
 
 #cleanup for password
 $password=$null
