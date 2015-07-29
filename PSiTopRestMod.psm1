@@ -568,6 +568,112 @@ param(
   $objData | where {$_.name -like "*$itop_name*"}
 }
 
+function Get-iTopRack {
+<#
+.SYNOPSIS
+  Query iTop server for all Racks and select a Rack if one is supplied.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST api. If no Rack name or Location is supplied, will return all Racks. If one is supplied will apply: 
+  
+  '"SELECT Rack WHERE name = " + "'" +$itop_name + "'" AND location_name = " + "'" +$Location + "'"
+.PARAMETER ServerAddress
+  FQDN of the iTop server you are running against.
+.PARAMETER Protocol
+  Whether you are connecting to the iTop instance over HTTP or HTTPS. Default is HTTPS.
+.PARAMETER Credential
+  The credentials that you are going to authenticate against the iTop REST API.
+.PARAMETER Location
+  The iTop Location where the rack resides.
+.PARAMETER itop_name
+  The iTop name of the Rack.
+.NOTES
+.EXAMPLE
+  Get-iTopVirtualMachine -ServerAddress "itop.foo.com" -Protocol https -Credential $Credentials -OSFamily Linux
+  Search for all Linux VMs.
+.EXAMPLE
+  C:\PS>function Get-iTopRack -ServerAddress "itop.foo.com" -Protocol https -Credential $Credentials -name TestRack -Location "DataCenter1"
+  
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#> 
+[CmdletBinding()]
+param(    
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$Location,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$iTop_name
+)
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+  $key = "SELECT Rack"
+  if (($Location) -and ($iTop_name)) {
+    # Custom OSFamily, if used
+    $key = "$key WHERE location_name = '$Location' AND name = '$iTop_name'"
+  } elseif ($Location) {
+    $key = "$key WHERE location_name = '$Location'"
+  } elseif ($iTop_name) {
+    $key = "$key WHERE name = '$iTop_name'"
+  }
+
+
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get'
+               class = 'Rack'
+               key = ("$key")
+               output_fields = '*'
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
+
+  # Generate REST URI
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
+
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
+
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
+
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
+  $objData = @()
+  foreach ($name in ($returnedJSON.objects | Get-Member -MemberType Properties).Name){
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                  'organization_name'=$returnedJSON.objects.$name.fields.organization_name
+                                  'org_id'=$returnedJSON.objects.$name.fields.org_id
+                                  'location_name'=$returnedJSON.objects.$name.fields.location_name
+                                  'location_id'=$returnedJSON.objects.$name.fields.location_id
+                                  'brand_name'=$returnedJSON.objects.$name.fields.brand_name
+                                  'brand_id'=$returnedJSON.objects.$name.fields.brand_id
+                                  'model_name'=$returnedJSON.objects.$name.fields.model_name
+                                  'RU'=$returnedJSON.objects.$name.fields.nb_u
+                                  'Key'=$returnedJSON.objects.$name.key}
+  }
+
+  # Run where block for specific query
+  $objData
+}
+
 function New-iTopNetModel {
     <#
 .SYNOPSIS
@@ -1047,6 +1153,7 @@ param(
   [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
   [string]$itop_brand_name,
   [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('high','medium','low')]
   [string]$itop_business_criticity = "low",
   [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
   [string]$itop_brand_id,
@@ -1059,6 +1166,7 @@ param(
   [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
   [string]$itop_location_name,
   [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [ValidateSet('production','implementation','obsolete','stock')]
   [string]$itop_status,
   [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
   [string]$itop_model_id,
@@ -1075,72 +1183,29 @@ param(
   [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
   [string]$itop_networkdevicetype_name,
   [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
-  [string]$itop_networkdevicetype_id
+  [string]$itop_networkdevicetype_id,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [datetime]$itop_purchase_date,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [datetime]$itop_move2production,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [datetime]$itop_end_of_warranty
+  
 ) 
-
-<# Possible fields
-name                              : 
-description                       : 
-org_id                            : 
-organization_name                 : 
-business_criticity                : low|medium|high
-move2production                   : 
-contacts_list                     : {}
-documents_list                    : {}
-applicationsolution_list          : {}
-providercontracts_list            : {}
-services_list                     : {}
-softwares_list                    : {}
-tickets_list                      : {}
-serialnumber                      : string
-location_id                       : int
-location_name                     : 
-status                            : production|implementation|stock|obsolete
-brand_id                          : 
-brand_name                        : 
-model_id                          : 
-model_name                        :
-asset_number                      : 
-purchase_date                     : 
-end_of_warranty                   : 
-networkdevice_list                : {}
-physicalinterface_list            : {}
-rack_id                           : 0
-rack_name                         : 
-enclosure_id                      : 0
-enclosure_name                    : 
-nb_u                              : 
-managementip                      : 
-powerA_id                         : 0
-powerA_name                       : 
-powerB_id                         : 0
-powerB_name                       : 
-fiberinterfacelist_list           : {}
-san_list                          : {}
-networkdevicetype_id              : 
-networkdevicetype_name            : 
-connectablecis_list               : {}
-iosversion_id                     : 
-iosversion_name                   : 
-ram                               : 
-finalclass                        : NetworkDevice
-friendlyname                      : 
-org_id_friendlyname               : 
-location_id_friendlyname          : 
-brand_id_friendlyname             : 
-model_id_friendlyname             : 
-rack_id_friendlyname              : 
-enclosure_id_friendlyname         : 
-powerA_id_friendlyname            : 
-powerA_id_finalclass_recall       : 
-powerB_id_friendlyname            : 
-powerB_id_finalclass_recall       : 
-networkdevicetype_id_friendlyname : 
-iosversion_id_friendlyname        : 
-#>
 
 #Convert Valid IP Back to string
 $itop_managementip = $itop_managementip.IPAddressToString
+
+#Convert datetimes into correct string formatting for iTop dates
+if ($itop_purchase_date){
+  [string]$itop_purchase_date = "{0:yyyy-MM-dd}" -f $itop_purchase_date
+  }
+if ($itop_end_of_warranty){
+  [string]$itop_end_of_warranty = "{0:yyyy-MM-dd}" -f $itop_end_of_warranty
+  }
+if ($itop_move2production){
+  [string]$itop_move2production = "{0:yyyy-MM-dd}" -f $itop_move2production
+  }
 
 # Creating header with credentials being used for authentication
 [string]$username = $Credential.UserName
@@ -1166,7 +1231,7 @@ if (![string]::IsNullOrEmpty($itop_description)){
 
 
 
-#Get Brand Key ID if null
+#Get Brand_ID key if null
 
 if ([string]::IsNullOrEmpty($itop_brand_id)){
 
@@ -1197,8 +1262,8 @@ $itop_brand_id = $objBrand[0].key
 
 }
 
-#get IOSVersion_id if IOS Vestion is populated.
-#Get Brand Key ID if null
+#get IOSVersion_id if IOS Version is populated.
+
 
 if ((![string]::IsNullOrEmpty($itop_iosversion_name)) -and [string]::IsNullOrEmpty($itop_iosversion_id)){
 
@@ -1230,7 +1295,7 @@ $itop_iosversion_id = $objIOS[0].key
 
 }
 
-#find ORG ID from org name
+#find ORG_ID key from org_name, if null
 if ([string]::IsNullOrEmpty($itop_org_id)){
 
 $getOrg = @{
@@ -1258,6 +1323,8 @@ $itop_org_id = $objOrg[0].Key
 
 
 }
+
+
 
 if ((![string]::IsNullOrEmpty($itop_model_name)) -and [string]::IsNullOrEmpty($itop_model_id)){
 
@@ -1324,6 +1391,286 @@ $CreateDevice = @{
 } 
 
 $variables = @((get-help New-iTopNetDevice -Parameter *).name)
+
+
+#add each parameter function to fields HT that starts with iTop and is not null or empty
+foreach ($var in $variables) {
+    
+    if (($var -like "itop_*") -and (![string]::IsNullOrEmpty((Get-Variable $var -ValueOnly))))
+    {
+        
+        $name = ($var).Replace('itop_','')
+        
+        $value = Get-Variable $var -ValueOnly
+
+
+        $CreateDevice.fields.Add("$name","$value")
+
+    }
+
+
+}
+
+
+#Generate JSON object
+$CreateDevice = $CreateDevice | ConvertTo-Json -Compress
+
+
+
+#generate ReST URI
+$uri = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$CreateDevice"
+#$uri
+
+
+
+
+#execute command and store returned JSON
+$returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+
+if($returnedJSON.message -like "Error*"){
+    return $returnedJSON
+    } else {
+    #$returnedJSON
+
+
+    $objData = @()
+
+    foreach ($name in (($returnedJSON.objects | Get-Member -MemberType NoteProperty).Name)){
+        
+        $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                  
+                                      'key'=$returnedJSON.objects.$name.key}
+
+    }
+
+    return $objData 
+
+
+    
+
+    }
+    #cleanup for headers and base64 var
+    $base64AuthInfo = $null
+    $headers = $null
+}
+
+function New-iTopRack { 
+[CmdletBinding()]
+param(
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_description,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_org_id,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_organization_name,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_brand_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('high','medium','low')]
+  [string]$itop_business_criticity = "low",
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_brand_id,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_friendlyname = $itop_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_serialnumber,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_location_id,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_location_name,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [ValidateSet('production','implementation','obsolete','stock')]
+  [string]$itop_status = "production",
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_model_id,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$itop_model_name,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_asset_number,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [datetime]$itop_purchase_date,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [datetime]$itop_move2production,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [datetime]$itop_end_of_warranty,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$itop_nb_u = "42" #This is the Rack Unit Field
+) 
+
+
+#Convert datetimes into correct string formatting for iTop dates
+if ($itop_purchase_date){
+  [string]$itop_purchase_date = "{0:yyyy-MM-dd}" -f $itop_purchase_date
+  }
+if ($itop_end_of_warranty){
+  [string]$itop_end_of_warranty = "{0:yyyy-MM-dd}" -f $itop_end_of_warranty
+  }
+if ($itop_move2production){
+  [string]$itop_move2production = "{0:yyyy-MM-dd}" -f $itop_move2production
+  }
+
+
+# Creating header with credentials being used for authentication
+[string]$username = $Credential.UserName
+[string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+$base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+$headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+#cleanup for password
+$password=$null
+
+
+#Sanitize Description of special Characters
+if (![string]::IsNullOrEmpty($itop_description)){
+    $itop_description = [System.Text.RegularExpressions.Regex]::Replace($itop_description,"[^0-9a-zA-Z_]"," ")
+    }
+
+#Sanitize Assetnumber of special Characters
+if (![string]::IsNullOrEmpty($itop_description)){
+    $itop_asset_number = [System.Text.RegularExpressions.Regex]::Replace($itop_asset_number,"[^0-9a-zA-Z_]"," ")
+    }
+
+
+
+#Get Brand Key ID if null
+
+if ([string]::IsNullOrEmpty($itop_brand_id)){
+
+$getBrand = @{
+             operation = 'core/get';
+             class = 'Brand';
+             key = ("SELECT Brand WHERE name = " + "'" +$itop_brand_name + "'");
+             output_fields= 'name';
+             } | ConvertTo-Json -Compress
+
+
+$brandURI = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$getBrand"
+$brand = Invoke-RestMethod -Uri $brandURI -Headers $headers -Method Post -ContentType 'application/json'
+
+$objBrand = @()
+
+foreach ($name in (($brand.objects | Get-Member -MemberType NoteProperty).Name))
+    {
+    
+    $objBrand += [PSCustomObject]@{'name'=$brand.objects.$name.fields.name                  
+                                  'key'=$brand.objects.$name.key}
+
+    }
+
+
+$itop_brand_id = $objBrand[0].key
+
+
+}
+
+
+#find ORG ID from org name
+if ([string]::IsNullOrEmpty($itop_org_id)){
+
+$getOrg = @{
+             operation = 'core/get';
+             class = 'Organization';
+             key = ("SELECT Organization WHERE name = " + "'" +$itop_organization_name + "'");
+             output_fields= 'name';
+             } | ConvertTo-Json -Compress
+
+
+$orgURI = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$getOrg"
+$org = Invoke-RestMethod -Uri $orgURI -Headers $headers -Method Post -ContentType 'application/json'
+
+$objOrg = @()
+
+foreach ($name in (($org.objects | Get-Member -MemberType NoteProperty).Name))
+    {
+    $objOrg += [PSCustomObject]@{'name'=$org.objects.$name.fields.name                  
+                                 'key'=$org.objects.$name.key}
+
+    }
+
+
+$itop_org_id = $objOrg[0].Key
+
+
+}
+
+#Get location_ID if name but not id is provided
+if ((![string]::IsNullOrEmpty($itop_location_name)) -and [string]::IsNullOrEmpty($itop_location_id)){
+
+$getLocation = @{
+             operation = 'core/get';
+             class = 'Location';
+             key = ("SELECT Location WHERE name = " + "'" +$itop_location_name + "'");
+             output_fields= 'name';
+             } | ConvertTo-Json -Compress
+
+
+$localURI = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$getLocation"
+$local = Invoke-RestMethod -Uri $localURI -Headers $headers -Method Post -ContentType 'application/json'
+
+$objLocal = @()
+
+foreach ($name in (($local.objects | Get-Member -MemberType NoteProperty).Name))
+    {
+    $objlocal += [PSCustomObject]@{'name'=$local.objects.$name.fields.name                  
+                                   'key'=$local.objects.$name.key}    
+
+    }
+
+
+$itop_location_id = $objlocal[0].Key
+
+
+}
+
+
+if ((![string]::IsNullOrEmpty($itop_model_name)) -and [string]::IsNullOrEmpty($itop_model_id)){
+
+$getModel = @{
+             operation = 'core/get';
+             class = 'Model';
+             key = ("SELECT Model WHERE name = " + "'" +$itop_model_name + "'");
+             output_fields= 'name';
+             } | ConvertTo-Json -Compress
+
+
+$modelURI = "$Protocol" + "://$ServerAddress/webservices/rest.php?version=1.0&json_data=$getModel"
+$model = Invoke-RestMethod -Uri $modelURI -Headers $headers -Method Post -ContentType 'application/json'
+
+$objModel = @()
+
+foreach ($name in (($model.objects | Get-Member -MemberType NoteProperty).Name))
+    {
+    $objModel += [PSCustomObject]@{'name'=$model.objects.$name.fields.name                  
+                                   'key'=$model.objects.$name.key}    
+
+    }
+
+
+$itop_model_id = $objModel[0].Key
+
+
+}
+
+
+$CreateDevice = @{
+   operation='core/create';
+   comment='PowershellAPI';
+   class= 'Rack';
+   output_fields= 'name';
+   fields = @{} 
+} 
+
+$variables = @((get-help New-iTopRack -Parameter *).name)
 
 
 #add each parameter function to fields HT that starts with iTop and is not null or empty
