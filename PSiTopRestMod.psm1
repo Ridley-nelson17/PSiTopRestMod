@@ -5,6 +5,97 @@
  NOTES:   Powershell module to interact with iTop Web API
 #>
 
+function Get-iTopVirtualMachine {
+<#
+.SYNOPSIS
+  Query iTop server for all available VMs and select a VM if one is supplied.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST api. If no VM guest name is supplied, will return all VMs. If one is supplied will apply: 
+  
+  '"SELECT Brand WHERE name = " + "'" +$iTopVM + "'"'
+.PARAMETER ServerAddress
+  FQDN of the iTop server you are running against.
+.PARAMETER Protocol
+  Whether you are connecting to the iTop instance over HTTP or HTTPS. Default is HTTPS.
+.PARAMETER Credential
+  The credentials that you are going to authenticate against the iTop REST API.
+.PARAMETER OSFamily
+  The OS flavor you want to filter on. Only Linux and Windows have been tested.
+.PARAMETER OQLFilter
+.NOTES
+.EXAMPLE
+  Get-iTopVirtualMachine -ServerAddress "itop.foo.com" -Protocol https -Credential $Credentials -OSFamily Linux
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#> 
+[CmdletBinding()]
+param(    
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$OSFamily,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$OQLFilter
+)
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+  $key = "SELECT VirtualMachine"
+  if ($OSFamily) {
+    # Custom OSFamily, if used
+    $key = "$key WHERE osfamily_name = '$OS'"
+  }
+  if ($OQLFilter) {
+    # Custom Filter is based off of iTop OQL query language
+    $key = "$key AND $OQLFilter"
+  }
+
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get'
+               class = 'VirtualMachine'
+               key = ("$key")
+               output_fields = '*'
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
+
+  # Generate REST URI
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
+
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
+
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
+
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
+  $objData = @()
+  foreach ($name in ($returnedJSON.objects | Get-Member -MemberType Properties).Name){
+    $objData += $returnedJSON.objects.$name.fields
+  }
+
+  # Run where block for specific query
+  $objData
+}
+
 function Get-iTopBrand {
 <#
 .SYNOPSIS
@@ -69,7 +160,7 @@ param(
   $objData = @()
   foreach ($name in ($returnedJSON.objects | Get-Member -MemberType Properties).Name){
     $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
-                                  'finalclass'=$returnedJSON.objects.$name.fields.finalclass
+                                  'class'=$returnedJSON.objects.$name.fields.finalclass
                                   'key'=$returnedJSON.objects.$name.key}
   }
 
