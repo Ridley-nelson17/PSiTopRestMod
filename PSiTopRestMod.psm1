@@ -5,6 +5,87 @@
  NOTES:   Powershell module to interact with iTop Web API
 #>
 
+function Get-iTopObject {
+<#
+.SYNOPSIS
+  Generic function to query iTop server with specific OQL query.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST API.
+.PARAMETER ServerAddress
+  FQDN of the iTop server you are running against.
+.PARAMETER Protocol
+  Whether you are connecting to the iTop instance over HTTP or HTTPS. Default is HTTPS.
+.PARAMETER Credential
+  The credentials that you are going to authenticate against the iTop REST API.
+.PARAMETER Class
+  The value to be passed into the class property of the JSON.
+.PARAMETER OQLFilter
+  Custom OQL query to be used.
+.NOTES
+.EXAMPLE
+  Get-iTopObject -ServerAddress $itopserver -Credential $apiuser -Protocol http -Class VirtualMachine -OQLFilter "SELECT VirtualMachine WHERE osfamily_name = 'Linux'"
+  Retrieve all VMs that have Linux as their osfamily_name property.
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#> 
+[CmdletBinding()]
+param(    
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$Class,
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$OQLFilter
+)
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get'
+               class = "$Class"
+               key = ("$OQLFilter")
+               output_fields = '*'
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
+
+  # Generate REST URI
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
+
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
+
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
+
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
+  $objData = @()
+  foreach ($name in ($returnedJSON.objects | Get-Member -MemberType Properties).Name){
+    $objData += $returnedJSON.objects.$name.fields
+  }
+
+  # Run where block for specific query
+  $objData
+}
+
 function Get-iTopVirtualMachine {
 <#
 .SYNOPSIS
@@ -22,9 +103,17 @@ function Get-iTopVirtualMachine {
 .PARAMETER OSFamily
   The OS flavor you want to filter on. Only Linux and Windows have been tested.
 .PARAMETER OQLFilter
+  Custom additional OQL query commands to be passed. By default, if this isn't used, the query is just "SELECT VirtualMachine" or "SELECT VirtualMachine WHERE osfamily_name = '$OS'"
+  If the OQLFilter is used, it is the same as doing "SELECT VirtualMachine AND $OQLFilter" or "SELECT VirtualMachine WHERE osfamily_name = '$OS' AND $OQLFilter"
 .NOTES
 .EXAMPLE
   Get-iTopVirtualMachine -ServerAddress "itop.foo.com" -Protocol https -Credential $Credentials -OSFamily Linux
+  Search for all Linux VMs.
+.EXAMPLE
+  C:\PS>$RegExp = '^server00.*$'
+  C:\PS>Get-iTopVirtualMachine -ServerAddress "itop.foo.com" -Protocol https -Credential $Credentials -OSFamily Windows -OQLFilter "name REGEXP '$REGEXP'"
+  
+  Search for Windows VMs starting with server00 in their 'name' property.
 .LINK
   https://github.com/jenquist/PSiTopRestMod
 #> 
