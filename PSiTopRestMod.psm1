@@ -384,7 +384,7 @@ return $objData | where {$_.name -like "*$itop_name*"}
 
 }
 
-function new-iTopNetModel {
+function New-iTopNetModel {
     <#
 .SYNOPSIS
   Post core/create to iTop server for new NetModel and return NetModel name and key.
