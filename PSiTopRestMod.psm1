@@ -568,6 +568,180 @@ param(
   $objData | where {$_.name -like "*$itop_name*"}
 }
 
+function Get-iTopOSFamily {
+<#
+.SYNOPSIS
+  Query iTop server for all OSFamilies and select a OSFamily if one is supplied.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST api. If no OSFamily name is supplied, will return all OSFamilies. If one is supplied will apply: 
+  
+  "SELECT OSFamily WHERE name = " + "'" +$itop_name
+.PARAMETER ServerAddress
+  FQDN of the iTop server you are running against.
+.PARAMETER Protocol
+  Whether you are connecting to the iTop instance over HTTP or HTTPS. Default is HTTPS.
+.PARAMETER Credential
+  The credentials that you are going to authenticate against the iTop REST API.
+.PARAMETER itop_name
+  The iTop name of the OSFamily.
+.NOTES
+.EXAMPLE
+  C:\PS>function Get-iTopOSFamily -ServerAddress "itop.foo.com" -Protocol https -Credential $Credentials -itop_name "Linux"
+  
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#> 
+[CmdletBinding()]
+param(    
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$iTop_name
+)
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+  $key = "SELECT OSFamily"
+  if ($iTop_name) {
+    $key = "$key WHERE location_name = '$iTop_name'"
+  }
+
+
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get'
+               class = 'OSFamily'
+               key = ("$key")
+               output_fields = 'name'
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
+
+  # Generate REST URI
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
+
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
+
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
+
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
+  $objData = @()
+  foreach ($name in ($returnedJSON.objects | Get-Member -MemberType Properties).Name){
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                  'Key'=$returnedJSON.objects.$name.key}
+  }
+
+  # Run where block for specific query
+  $objData
+}
+
+function Get-iTopOSVersion {
+<#
+.SYNOPSIS
+  Query iTop server for all OSVersions and select a OSVersion if one is supplied.
+.DESCRIPTION
+  Sends a core/get operation to the iTop REST api. If no OSVersion name is supplied, will return all OSVersions. If one is supplied will apply: 
+  
+  "SELECT OSVersion WHERE name = " + "'" +$itop_name
+.PARAMETER ServerAddress
+  FQDN of the iTop server you are running against.
+.PARAMETER Protocol
+  Whether you are connecting to the iTop instance over HTTP or HTTPS. Default is HTTPS.
+.PARAMETER Credential
+  The credentials that you are going to authenticate against the iTop REST API.
+.PARAMETER itop_name
+  The iTop name of the OSVersion.
+.NOTES
+.EXAMPLE
+  C:\PS>function Get-iTopOSVersion -ServerAddress "itop.foo.com" -Protocol https -Credential $Credentials -itop_name "Linux"
+  
+.LINK
+  https://github.com/jenquist/PSiTopRestMod
+#> 
+[CmdletBinding()]
+param(    
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [string]$ServerAddress,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [ValidateSet('https','http')]
+  [string]$Protocol='https',
+  [Parameter(Mandatory=$true,ValueFromPipeline=$False)]
+  [PSCredential]$Credential,
+  [Parameter(Mandatory=$false,ValueFromPipeline=$False)]
+  [string]$iTop_name
+)
+  # Creating header with credentials being used for authentication
+  [string]$username = $Credential.UserName
+  [string]$password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Credential.Password))
+  $base64AuthInfo = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f "$username","$password")))
+
+  $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+  $headers.Add("Authorization",("Basic {0}" -f $base64AuthInfo))
+
+  $key = "SELECT OSVersion"
+  if ($iTop_name) {
+    $key = "$key WHERE location_name = '$iTop_name'"
+  }
+
+
+  # Creating in-line JSON to be sent within URI
+  $sendJSON = @{
+               operation = 'core/get'
+               class = 'OSVersion'
+               key = ("$key")
+               output_fields = '*'
+               } | ConvertTo-Json -Compress
+  Write-Verbose "Sending JSON..."
+  Write-Verbose "$sendJSON"
+
+  # Generate REST URI
+  $uri = "$($Protocol)://$ServerAddress/webservices/rest.php?version=1.1&json_data=$sendJSON"
+  Write-Verbose "REST URI: $uri"
+
+  # Execute command and store returned JSON
+  $returnedJSON = Invoke-RestMethod -Uri $uri -Headers $headers -Method Post -ContentType 'application/json'
+  Write-Verbose "Server returned: 
+  $returnedJSON"
+
+  # Break out of function with warning message if no results returned
+  if (!$returnedJSON.objects) {
+    Write-Warning "Search has returned 0 results."
+    break
+  }
+
+  # Convert returned JSON into easily consumable PowerShell objects by
+  # Parsing server response to build a non-nested object
+  $objData = @()
+  foreach ($name in ($returnedJSON.objects | Get-Member -MemberType Properties).Name){
+    $objData += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name
+                                  'osfamily_name'=$returnedJSON.objects.$name.fields.osfamily_name
+                                  'osfamily_id'=$returnedJSON.objects.$name.fields.osfamily_id
+                                  'Key'=$returnedJSON.objects.$name.key}
+  }
+
+  # Run where block for specific query
+  $objData
+}
+
 function Get-iTopRack {
 <#
 .SYNOPSIS
@@ -860,7 +1034,7 @@ foreach ($name in (($brand.objects | Get-Member -MemberType NoteProperty).Name))
     }
 
 
-$itop_brand_id = $objBrand[0].DeviceTypeKey
+$itop_brand_id = $objBrand[0].Key
 
 
 }
@@ -1141,7 +1315,7 @@ if ([string]::IsNullOrEmpty($itop_org_id)){
 $getOrg = @{
              operation = 'core/get';
              class = 'Organization';
-             key = ("SELECT Organization WHERE name = " + "'" +$itop_org_name + "'");
+             key = ("SELECT Organization WHERE name = " + "'" +$itop_organization_name + "'");
              output_fields= '*';
              } | ConvertTo-Json -Compress
 
@@ -1156,8 +1330,8 @@ $objOrg = @()
 foreach ($name in (($org.objects | Get-Member -MemberType NoteProperty).Name))
     {
     
-    $objOrg += [PSCustomObject]@{'name'=$returnedJSON.objects.$name.fields.name                            
-                                  'key'=$returnedJSON.objects.$name.key}
+    $objOrg += [PSCustomObject]@{'name'=$org.objects.$name.fields.name                            
+                                  'key'=$org.objects.$name.key}
 
 
     }
@@ -2195,13 +2369,13 @@ $objosfamily = @()
 
 foreach ($name in (($osfamily.objects | Get-Member -MemberType NoteProperty).Name))
     {
-    $objosfamily += [PSCustomObject]@{'name'=$osfamily.objects.$name.fields.name                  
-                                   'key'=$osfamily.objects.$name.key}    
+    $objosfamily += [PSCustomObject]@{'name'=$osfamily.objects.$name.fields.name            
+                                      'key'=$osfamily.objects.$name.key}    
 
     }
 
 
-$itop_osfamily_id = $objosfamily[0].Key
+$itop_osfamily_id = $objosfamily[0].key
 
 
 }
@@ -2346,6 +2520,7 @@ foreach ($var in $variables) {
         
         $value = Get-Variable $var -ValueOnly
 
+
         $CreateDevice.fields.Add("$name","$value")
 
     }
@@ -2385,6 +2560,9 @@ if($returnedJSON.message -like "Error*"){
     }
 
     return $objData 
+
+
+    
 
     }
     #cleanup for headers and base64 var
